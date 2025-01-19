@@ -85,9 +85,24 @@ def recommend_products(
         recommendations = pd.concat([top_high_freq, remaining_items]).head(top_n)
 
         if len(recommendations) < top_n:
-            print(f"Only {len(recommendations)} CF recommendations available.")
+            all_products = df["product_id"].unique()
+            additional_candidates = [
+                product_id for product_id in all_products if product_id not in recommendations["product_id"].values
+            ]
 
-        return recommendations
+            additional_scores = [
+                (product_id, cf_model.predict(target_user_id, product_id).est)
+                for product_id in additional_candidates
+            ]
+
+            additional_scores_df = pd.DataFrame(additional_scores, columns=["product_id", "predicted_score"])
+            additional_scores_df = additional_scores_df.merge(product_details, on="product_id", how="left")
+            additional_scores_df = additional_scores_df.sort_values(by="predicted_score", ascending=False)
+            additional_recommendations = additional_scores_df.head(top_n - len(recommendations))
+
+            recommendations = pd.concat([recommendations, additional_recommendations])
+
+        return recommendations.head(top_n)
 
     else:
         # -----------------------------
